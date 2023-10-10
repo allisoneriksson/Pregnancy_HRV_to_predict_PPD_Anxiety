@@ -1,0 +1,1028 @@
+---
+title: "Study1_HRV_ENreg"
+author: "Allison Eriksson"
+date: "`r Sys.Date()`"
+output:
+  html_document
+    toc: true
+    toc_float: true
+    collapsed: false
+    number_sections: true
+    editor_options:
+  chunk_output_type: console
+---
+Install packages
+```{r setup, include=FALSE}
+
+library(naniar) #for checking data
+
+library(glmnet)
+
+library(foreign)
+
+library(pROC)
+
+library(doParallel)
+
+library(tidyr)
+
+library(ggplot2)
+
+library(mice) #imputation
+
+library(tidyverse)
+
+library(MASS)
+
+
+library(lars)
+
+library(caret) #LOOCV 
+
+library(dplyr)
+
+library(generalCorr)
+
+library(Hmisc)
+
+library(lattice)
+
+pkgs <- list("glmnet", "doParallel", "foreach","ggplot2", "pROC", "naniar", "mice", "tidyverse", "lars", "caret", "generalCorr", "MASS", "dplyr", "Hmisc", "lattice")
+lapply(pkgs, require, character.only = T)
+registerDoParallel(cores = 5)
+
+```
+# DATA SETUP
+## Check data
+```{r setup, include=FALSE}
+#from website https://www.r-bloggers.com/2017/09/variable-selection-with-elastic-net/ 
+ 
+
+hist(HRV_HFpow1)
+ hist(HRV_HFpow2)
+ hist(HRV_LFHF_1) #skewed 
+ hist(HRV_LFHF_2)#skewed 
+ hist(HRV_LFpow_1)
+ hist(HRV_LFpow_2)
+ hist(HRV_POW1)
+ hist(HRV_POW2)
+ hist(HRV_RMSSD_1)#skewed 
+ hist(HRV_RMSSD_2)
+ hist(HRV_SDNN_1)
+ hist(HRV_SDNN_2)
+ hist(HRV_TP_1)
+ hist(HRV_TP_2)
+ hist(scale(HRV_LFHF_2))
+hist(HRV_LFHF_2)
+
+
+```
+
+## VARIABLE TRANSFORMATION
+```{r }
+##https://towardsdatascience.com/smart-handling-of-missing-data-in-r-6425f8a559f2
+
+### Transform variables to df1, add original and transformed variables to df_short list 
+#imported spss file manually
+df1 <- BASIC_updated_22nov_na_rm
+#df1 = read.spss("/Users/aller405/Desktop/BASIC_updated_22nov_na.rm.sav", to.data.frame=TRUE,)
+
+POB <- as.numeric(df1$v17_fodelseort_R)
+df1$POB <- POB
+
+# POBtext <- (df1$v17_fodelseort_R)
+# df1$POBtext <- POBtext
+
+pp_EPDS <- as.numeric(df1$ppv6_EPDS_10_11R)
+df1$pp_EPDS <- pp_EPDS
+
+ppEPDStot <- as.numeric(df1$ppv6_EPDS_9R)
+df1$ppEPDStot <- ppEPDStot
+
+pp_BECK <- as.numeric(df1$ppv6_beck_score_R_01)
+df1$pp_BECK <- pp_BECK
+
+ppBECKtot <- as.numeric(df1$ppv6_beck_tot_R)
+df1$ppBECKtot <- ppBECKtot
+
+
+EDU <- as.numeric(as.numeric(df1$v17_utbildning_R_01))
+df1$EDU <- EDU
+
+# EDUtext <- (as.numeric(df1$v17_utbildning_R_01))
+# df1$EDUtext <- EDUtext
+
+SLEEP <- as.numeric(as.numeric(df1$v32_somn))
+df1$SLEEP <- SLEEP
+
+# SLEEPtext <- (as.numeric(df1$v32_somn))
+# df1$SLEEPtext <- SLEEPtext
+
+AGE <- as.numeric(df1$B_alder_groups)
+df1$AGE <- AGE 
+
+AGE_tot <- (as.numeric(df1$NK_Age_at_partus))
+df1$AGE_tot <- AGE_tot 
+
+EPDS32 <- as.numeric(df1$v32_EPDS_D_9R)
+df1$EPDS32 <- EPDS32
+
+EPDS_32_tot <- as.numeric(df1$v32_EPDS_9R)
+df1$EPDS_32_tot <- EPDS_32_tot
+
+BECK_32_tot <- as.numeric(df1$v32_beck_tot_R)
+df1$BECK_32_tot <- BECK_32_tot
+
+BECK32 <- as.numeric(df1$v32_beck_score_R_01)
+df1$BECK32 <- BECK32
+
+FOD <- as.numeric(df1$NK_delivery_fear_2)
+df1$FOD <- FOD
+
+# FODtext <- (df1$NK_delivery_fear_2)
+# df1$FODtext <- FODtext
+
+# #### Figure out how to dichotomize this variable- less than 65 is low resilience. Try to transform in short df after imputation? 
+# df1$RS_14 <- factor(df1$v32_RS_14_SCORE_R)
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="Very low"] <- "0"
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="Low"] <- "0"
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="On the low end"] <- "0"
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="On the low end"] <- "0"
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="Moderate"] <- "1"
+# df1s$RS_14[df1$v32_RS_14_SCORE_R =="Moderately high"] <- "1"
+# df1$RS_14[df1$v32_RS_14_SCORE_R =="High"] <- "1"
+
+RS_14_tot <- as.numeric(df1$v32_RS_14_R)
+df1$RS_14_tot <- RS_14_tot
+
+
+BMI_tot <- as.numeric(df1$v32_BMI)
+df1$BMI_tot <- BMI_tot
+
+BMI <- as.numeric(df1$v32_BMI_groups_R)
+df1$BMI <- BMI
+
+PAR <- as.numeric(df1$NK_parity_D)
+df1$PAR <- PAR
+
+# PARtext<- (df1$NK_parity)
+# df1$PARtext <- PARtext
+
+ILL <- as.numeric(df1$Illness_combined)
+df1$ILL <- ILL
+
+# ILLtext <- (df1$Illness_combined_variables)
+# df1$ILLtext <- ILLtext
+
+DEPH <- as.numeric(df1$NK_depression_history)
+df1$DEPH <- DEPH
+
+# DEPHtext <- (df1$NK_depression_history)
+# df1$DEPHtext <- DEPHtext
+
+SSRI <- as.numeric(df1$NK_SSRI_pregnancy_loose)
+df1$SSRI <- SSRI
+
+# SSRItext <- (df1$NK_SSRI_pregnancy_loose)
+# df1$SSRItext <- SSRItext
+
+df1$NK_SSRI_pregnancy_loose
+
+HRV_HFpow_1<- df1$HRV_HFpower_pregnv1
+df1$HRV_HFpow_1 <- HRV_HFpow_1
+
+HRV_HFpow_2 <- (df1$HRV_HFpower_pregnv2)
+df1$HRV_HFpow_2 <- HRV_HFpow_2
+
+
+HRV_LFpow_1 <- (df1$HRV_LFpower_pregnv1)
+df1$HRV_LFpow_1 <- HRV_LFpow_1
+
+HRV_LFpow_2 <- (df1$HRV_LFpower_pregnv2)
+df1$HRV_LFpow_2 <- HRV_LFpow_2
+
+HRV_TP_1 <- (df1$HRV_Totalpower_pregnv1)
+df1$HRV_TP_1 <- HRV_TP_1
+
+HRV_TP_2 <- (df1$HRV_Totalpower_pregnv2)
+df1$HRV_TP_2 <- HRV_TP_2
+
+
+HRV_RMSSD_1 <- (df1$HRV_RMSSD_pregnv1)
+df1$HRV_RMSSD_1 <- HRV_RMSSD_1
+
+HRV_RMSSD_2 <- (df1$HRV_RMSSD_pregnv2)
+df1$HRV_RMSSD_2 <- HRV_RMSSD_2
+
+HRV_SDNN_1 <- (df1$HRV_SDNNms_pregnv1)
+df1$HRV_SDNN_1 <- HRV_SDNN_1
+
+HRV_SDNN_2 <- (df1$HRV_SDNNms_pregnv2)
+df1$HRV_SDNN_2 <- HRV_SDNN_2
+
+HRV_LFHF_1 <- (df1$HRV_LFHFratio_pregnv1)
+df1$HRV_LFHF_1 <- HRV_LFHF_1
+
+HRV_LFHF_2 <- (df1$HRV_LFHFratio_pregnv2)
+df1$HRV_LFHF_2 <- HRV_LFHF_2
+
+
+```
+
+##Select variables of interest
+
+```{r }
+# if error in select: https://www.geeksforgeeks.org/how-to-fix-error-in-select-unused-arguments-in-r/
+#make a selection without outcome variables for imputation (cannot impute outcome varaibles)! 
+df1_tib <- as_tibble(df1)
+
+df_short_pred_only <- df1_tib %>% dplyr::select(POB, EDU, SLEEP, AGE_tot, BMI_tot, BMI, PAR, ILL, DEPH, SSRI, FOD, RS_14_tot, 
+                                                EPDS_32_tot, BECK_32_tot , HRV_HFpow_1, HRV_HFpow_2, HRV_LFpow_1, HRV_LFpow_2, HRV_TP_1, HRV_TP_2,
+                                                HRV_RMSSD_1, HRV_RMSSD_2, HRV_SDNN_1, HRV_SDNN_2, HRV_LFHF_1, HRV_LFHF_2)    
+
+
+#Check correlations
+
+cormatrix <- rcorr(as.matrix(df_short_pred_only, type = "pearson"))
+cormatrix
+cormatrixP <- round(cormatrix$P,2)
+cormatrixN <- round(cormatrix$n,2)
+cormatrixR <- round(cormatrix$r,2)
+
+gc()
+```
+# IMPUTATION
+## Check data before imputation
+```{r}
+# Are there missing values in the dataset?
+any_na(df_short_pred_only)
+# How many?
+n_miss(df_short_pred_only)
+prop_miss(df_short_pred_only)
+# Which variables are affected?
+df_short_pred_only %>% is.na() %>% colSums()
+
+# Get number of missings per variable (n and %)
+miss_var_summary(df_short_pred_only)
+miss_var_table(df_short_pred_only)
+# Get number of missings per participant (n and %)
+miss_case_summary(df_short_pred_only)
+miss_case_table(df_short_pred_only)
+
+# Which variables contain the most missing variables?
+gg_miss_var(df_short_pred_only)
+
+# Where are missings located?
+vis_miss(df_short_pred_only) + theme(axis.text.x = element_text(angle=80))
+
+# Which combinations of variables occur to be missing together?
+gg_miss_upset(df_short_pred_only)
+
+
+# # Get a heatmap of missingness broken down by ppBECK
+# is.factor(df_short$ppBECK)
+# gg_miss_fct(df_short, fct = ppBECK)
+
+
+
+```
+
+## MICE Imputation
+
+```{r}
+
+tbl_df_short_pred <- as_tibble(df_short_pred_only) #### Why should it be in tbl format? 
+df_short_pred_mat <- quickpred(tbl_df_short_pred, mincor = 0.25)
+df_short_imp_pred <- mice(tbl_df_short_pred, m = 10, meth='pmm', seed = 14221, predictorMatrix = df_short_pred_mat)
+df_pred_complete <- complete(df_short_imp_pred)
+
+any_na(df_pred_complete)
+gc()
+
+
+```
+
+# EPDS SETUP
+```{r}
+# Create a dataset with ppEPDS variable + predictors 
+df_epds_pred_complete <- df_pred_complete
+df_epds_pred_complete$pp_EPDS <- pp_EPDS
+df_epds_pred_complete <- df_epds_pred_complete[!is.na(df_epds_pred_complete$pp_EPDS),]
+
+#Create factors with levels 
+df_epds_pred_complete$pp_EPDS <- 
+  factor(df_epds_pred_complete$pp_EPDS, 
+         levels=c(0,1),
+         labels=c("Non-PPD", # Reference
+                  "PPD"))
+```
+
+# BECK SETUP
+```{r}
+ #####
+### Adding BAI to imputed variable data 
+gc()
+# Create a dataset with ppBECK variable + predictors 
+df_beck_pred_complete <- df_pred_complete
+df_beck_pred_complete$pp_BECK <- pp_BECK
+df_beck_pred_complete <- df_beck_pred_complete[!is.na(df_beck_pred_complete$pp_BECK),]
+#df_beck_pred_complete$pp_BECK <- recode(df_beck_pred_complete$pp_BECK, 
+                                        #`1` = "0", `2` = "1")
+#Create factors with levels 
+df_beck_pred_complete$pp_BECK <- 
+  factor(df_beck_pred_complete$pp_BECK, 
+         levels=c(0,1))
+        # labels=c("Non-anxious", # Reference
+                 # "Anxious"))
+```
+
+
+```{r}
+
+```
+
+# TABLE 2
+
+```{r}
+# Dep histogram
+histogram(df_epds_pred_complete$HRV_HFpow_1)
+histogram(df_epds_pred_complete$HRV_HFpow_2)
+histogram(df_epds_pred_complete$HRV_LFpow_1)
+histogram(df_epds_pred_complete$HRV_LFpow_2)
+histogram(df_epds_pred_complete$HRV_TP_1)
+histogram(df_epds_pred_complete$HRV_TP_2)
+histogram(df_epds_pred_complete$HRV_LFHF_1)
+histogram(df_epds_pred_complete$HRV_LFHF_2)
+histogram(df_epds_pred_complete$HRV_RMSSD_1) # Skewed
+histogram(df_epds_pred_complete$HRV_RMSSD_2) # Skewed
+histogram(df_epds_pred_complete$HRV_SDNN_1)
+histogram(df_epds_pred_complete$HRV_SDNN_2)
+
+# HRV/DEP group differences 
+t.test(df_epds_pred_complete$HRV_HFpow_1  ~  df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_HFpow_2  ~  df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_LFpow_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_LFpow_2 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_TP_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_TP_2 ~ df_epds_pred_complete$pp_EPDS)
+
+df_epds_pred_complete$pp_EPDS <- as.numeric(df_epds_pred_complete$pp_EPDS)
+wilcox.test(df_epds_pred_complete$HRV_RMSSD_1, df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(df_epds_pred_complete$HRV_RMSSD_2, df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_SDNN_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_SDNN_2 ~ df_epds_pred_complete$pp_EPDS)
+
+
+# ANX histogram
+
+histogram(df_beck_pred_complete$HRV_HFpow_1)
+histogram(df_beck_pred_complete$HRV_HFpow_2)
+histogram(df_beck_pred_complete$HRV_LFpow_1)
+histogram(df_beck_pred_complete$HRV_LFpow_2)
+histogram(df_beck_pred_complete$HRV_TP_1)
+histogram(df_beck_pred_complete$HRV_TP_2)
+histogram(df_beck_pred_complete$HRV_LFHFpow_1)
+histogram(df_beck_pred_complete$HRV_LFHFpow_2)
+histogram(df_beck_pred_complete$HRV_RMSSD_1) # Skewed
+histogram(df_beck_pred_complete$HRV_RMSSD_2) # Skewed
+histogram(df_beck_pred_complete$HRV_SDNN_1)
+histogram(df_beck_pred_complete$HRV_SDNN_2)
+
+#ANX/HRV group differences
+t.test(df_beck_pred_complete$HRV_HFpow_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_HFpow_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_LFpow_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_LFpow_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_TP_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_TP_2  ~  df_beck_pred_complete$pp_BECK)
+
+df_beck_pred_complete$pp_BECK <- as.numeric(df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_LFHF_1  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_LFHF_2  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_RMSSD_1  ~  df_beck_pred_complete$pp_BECK)
+
+
+wilcox.test(df_beck_pred_complete$HRV_RMSSD_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_SDNN_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_SDNN_2  ~  df_beck_pred_complete$pp_BECK)
+
+```
+
+
+
+
+```{r}
+
+
+```
+
+
+## ELASTIC NET REGRESSION with DEP outcome for whole dataset with all predictors imputed
+```{r}
+set.seed(123987)  #123987 used in final model
+n <- nrow(df_epds_pred_complete)
+sample <- sample(seq(n), size = n * 0.8, replace = FALSE) 
+train <- df_epds_pred_complete[ sample, ]
+test <- df_epds_pred_complete[-sample,]
+# str(train)
+# summary(train)
+# names(df_epds_pred_complete)
+# any_na(df_epds_pred_complete)
+# class(df_epds_pred_complete$pp_EPDS)
+
+
+mdlY <- as.factor(data.matrix(train[,"pp_EPDS" ],))
+mdlX <-scale (as.matrix(train[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot",
+                                 "EPDS_32_tot", "BECK_32_tot" , "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                 "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+newY <- as.factor(data.matrix(test[,"pp_EPDS"], ))
+newX <- scale (as.matrix(test[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot",
+                                 "EPDS_32_tot", "BECK_32_tot" , "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                 "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+
+### removed "RS_14_tot",
+#### Elastic net 
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+#md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = .25, alpha = .25)
+coef(md_dep)
+
+roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+
+ROC_Final_EPDS_Com = roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+ggroc(ROC_Final_EPDS_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with depression outcome ',
+                 '(AUC = ', round(ROC_Final_EPDS_Com$auc,4),')'))
+
+```
+## Output
+```{r}
+roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+
+ROC_Final_EPDS_Com = roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+ggroc(ROC_Final_EPDS_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with depression outcome ',
+                 '(AUC = ', round(ROC_Final_EPDS_Com$auc,4),')'))
+
+
+# 26 x 1 sparse Matrix of class "dgCMatrix"
+# s0
+# (Intercept) -1.13427003
+# POB          .         
+# EDU          .         
+# SLEEP        .         
+# AGE_tot      .         
+# BMI          .         
+# PAR          .         
+# ILL          .         
+# DEPH         .         
+# SSRI         .         
+# FOD          .         
+# RS_14_tot   -0.23200202
+# EPDS_32_tot  0.26697753
+# BECK_32_tot  0.14608420
+# HRV_HFpow_1 -0.08520759
+# HRV_HFpow_2  .         
+# HRV_LFpow_1 -0.03675938
+# HRV_LFpow_2  .         
+# HRV_TP_1    -0.03835127
+# HRV_TP_2    -0.04113627
+# HRV_RMSSD_1  .         
+# HRV_RMSSD_2  .         
+# HRV_SDNN_1   .         
+# HRV_SDNN_2  -0.04582977
+# HRV_LFHF_1   .         
+# HRV_LFHF_2   .         
+# > roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+# Setting levels: control = Non-PPD, case = PPD
+# Setting direction: controls < cases
+# 
+# Call:
+#   roc.default(response = newY, predictor = as.numeric(predict(md_dep,     newX, type = "response")))
+# 
+# Data: as.numeric(predict(md_dep, newX, type = "response")) in 20 controls (newY Non-PPD) < 3 cases (newY PPD).
+# Area under the curve: 0.9333
+
+#lambda = 0.2500912
+#alpha = 0.25
+
+# Setting alpha = .25 as in final model
+# cv1 <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10,type.measure = "deviance", parallel = TRUE, alpha = .25)
+# md1 <- glmnet(mdlX, mdlY, family = "binomial", lambda = .25, alpha = .25)
+# coef(md1)
+# 
+# roc(newY, as.numeric(predict(md1, newX, type = "response")))
+
+
+
+```
+
+
+#BECK SETUP (rerun before doing EN!!)
+```{r}
+ #####
+### Adding BAI to imputed variable data 
+gc()
+# Create a dataset with ppBECK variable + predictors 
+df_beck_pred_complete <- df_pred_complete
+df_beck_pred_complete$pp_BECK <- pp_BECK
+df_beck_pred_complete <- df_beck_pred_complete[!is.na(df_beck_pred_complete$pp_BECK),]
+#df_beck_pred_complete$pp_BECK <- recode(df_beck_pred_complete$pp_BECK, 
+                                        #`1` = "0", `2` = "1")
+#Create factors with levels 
+df_beck_pred_complete$pp_BECK <- 
+  factor(df_beck_pred_complete$pp_BECK, 
+         levels=c(0,1))
+        # labels=c("Non-anxious", # Reference
+                 # "Anxious"))
+
+```
+
+
+
+## EN reg for ANX outcome with all predictors 
+```{r}
+set.seed(123987)
+n <- nrow(df_beck_pred_complete)
+sample <- sample(seq(n), size = n * 0.5, replace = FALSE) 
+train <- df_beck_pred_complete[sample,]
+test <- df_beck_pred_complete[-sample,]
+class(df_beck_pred_complete$pp_BECK)
+# names(df_beck_pred_complete)
+# any_na(df_beck_pred_complete)
+
+mdlY <- (data.matrix(train[,"pp_BECK" ],))
+
+mdlX <-scale(data.matrix(train[,c( "POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot", 
+                                   "EPDS_32_tot", "BECK_32_tot" , "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                   "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+newY <- (data.matrix(test[,"pp_BECK"], ))
+newX <- scale(data.matrix(test[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot", 
+                                  "EPDS_32_tot", "BECK_32_tot" , "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                  "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+
+
+
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = .15, alpha = .35)
+#md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+coef(md_anx)
+#class(newY)
+roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+ROC_EN_BECK_Com = roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+as.factor(as.numeric(newY))
+
+ggroc(ROC_EN_BECK_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with anxiety outcome ',
+                 '(AUC = ', round(ROC_EN_BECK_Com$auc,4),')'))
+```
+# SUPP MODELS     
+## EN Reg for DEP T1 only 
+```{r}
+set.seed(123987)  #123987 used in final model
+n <- nrow(df_epds_pred_complete)
+sample <- sample(seq(n), size = n * 0.8, replace = FALSE) 
+train <- df_epds_pred_complete[ sample, ]
+test <- df_epds_pred_complete[-sample,]
+# str(train)
+# summary(train)
+# names(df_epds_pred_complete)
+# any_na(df_epds_pred_complete)
+# class(df_epds_pred_complete$pp_EPDS)
+
+
+mdlY <- as.factor(data.matrix(train[,"pp_EPDS" ],))
+mdlX <-scale (as.matrix(train[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot",
+                                 "EPDS_32_tot", "BECK_32_tot" ), ]))
+newY <- as.factor(data.matrix(test[,"pp_EPDS"], ))
+newX <- scale (as.matrix(test[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot",
+                                 "EPDS_32_tot", "BECK_32_tot"), ]))
+
+### removed "RS_14_tot",
+#### Elastic net 
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+#md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = .24, alpha = .35)
+coef(md_dep)
+
+roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+
+ROC_Final_EPDS_Com = roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+ggroc(ROC_Final_EPDS_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with depression outcome ',
+                 '(AUC = ', round(ROC_Final_EPDS_Com$auc,4),')'))
+
+```
+
+   
+## EN Reg for ANX T1 only
+
+```{r}
+set.seed(123987)
+n <- nrow(df_beck_pred_complete)
+sample <- sample(seq(n), size = n * 0.5, replace = FALSE) 
+train <- df_beck_pred_complete[sample,]
+test <- df_beck_pred_complete[-sample,]
+class(df_beck_pred_complete$pp_BECK)
+# names(df_beck_pred_complete)
+# any_na(df_beck_pred_complete)
+
+mdlY <- (data.matrix(train[,"pp_BECK" ],))
+
+mdlX <-scale(data.matrix(train[,c( "POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot", 
+                                   "EPDS_32_tot", "BECK_32_tot"), ]))
+newY <- (data.matrix(test[,"pp_BECK"], ))
+newX <- scale(data.matrix(test[,c("POB", "EDU", "SLEEP", "AGE_tot", "BMI_tot","PAR", "ILL", "DEPH", "SSRI", "FOD", "RS_14_tot", 
+                                  "EPDS_32_tot", "BECK_32_tot"), ]))
+
+
+
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+#md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = .15, alpha = .35)
+md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+coef(md_anx)
+#class(newY)
+roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+ROC_EN_BECK_Com = roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+as.factor(as.numeric(newY))
+
+ggroc(ROC_EN_BECK_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with anxiety outcome ',
+                 '(AUC = ', round(ROC_EN_BECK_Com$auc,4),')'))
+```
+
+### OUTPUT
+```{r}
+# 14 x 1 sparse Matrix of class "dgCMatrix"
+#                     s0
+# (Intercept) -1.9815367
+# POB          .        
+# EDU          .        
+# SLEEP        .        
+# AGE_tot      .        
+# BMI_tot      .        
+# PAR          .        
+# ILL          .        
+# DEPH         .        
+# SSRI         .        
+# FOD          .        
+# RS_14_tot    .        
+# EPDS_32_tot  .        
+# BECK_32_tot  0.5191754
+
+
+```
+
+
+
+##  EN Reg for DEP HRV only
+
+```{r}
+set.seed(123987)  #123987 used in final model
+n <- nrow(df_epds_pred_complete)
+sample <- sample(seq(n), size = n * 0.8, replace = FALSE) 
+train <- df_epds_pred_complete[ sample, ]
+test <- df_epds_pred_complete[-sample,]
+# str(train)
+# summary(train)
+# names(df_epds_pred_complete)
+# any_na(df_epds_pred_complete)
+# class(df_epds_pred_complete$pp_EPDS)
+
+
+mdlY <- as.factor(data.matrix(train[,"pp_EPDS" ],))
+mdlX <-scale (as.matrix(train[,c( "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                 "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+newY <- as.factor(data.matrix(test[,"pp_EPDS"], ))
+newX <- scale (as.matrix(test[,c("HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                 "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+
+### removed "RS_14_tot",
+#### Elastic net 
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+#md_dep <- glmnet(mdlX, mdlY, family = "binomial", lambda = .25, alpha = .25)
+coef(md_dep)
+
+roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+
+ROC_Final_EPDS_Com = roc(newY, as.numeric(predict(md_dep, newX, type = "response")))
+
+ggroc(ROC_Final_EPDS_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with depression outcome ',
+                 '(AUC = ', round(ROC_Final_EPDS_Com$auc,4),')'))
+```
+### Output
+```{r}
+# 13 x 1 sparse Matrix of class "dgCMatrix"
+#                      s0
+# (Intercept) -1.05635786
+# HRV_HFpow_1 -0.09625537
+# HRV_HFpow_2  .         
+# HRV_LFpow_1  .         
+# HRV_LFpow_2  .         
+# HRV_TP_1     .         
+# HRV_TP_2     .         
+# HRV_RMSSD_1  .         
+# HRV_RMSSD_2  .         
+# HRV_SDNN_1   .         
+# HRV_SDNN_2   .         
+# HRV_LFHF_1   .         
+# HRV_LFHF_2   .  
+
+
+
+# cv3$lambda.1se
+# [1] 0.1430657
+# > alpha = cv3$alpha
+# > cv3$alpha
+# [1] 0.75
+```
+
+
+
+## EN Reg for ANX HRV only
+
+```{r}
+set.seed(123987)
+n <- nrow(df_beck_pred_complete)
+sample <- sample(seq(n), size = n * 0.5, replace = FALSE) 
+train <- df_beck_pred_complete[sample,]
+test <- df_beck_pred_complete[-sample,]
+class(df_beck_pred_complete$pp_BECK)
+# names(df_beck_pred_complete)
+# any_na(df_beck_pred_complete)
+
+mdlY <- (data.matrix(train[,"pp_BECK" ],))
+
+mdlX <-scale(data.matrix(train[,c( "HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                   "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+newY <- (data.matrix(test[,"pp_BECK"], ))
+newX <- scale(data.matrix(test[,c("HRV_HFpow_1", "HRV_HFpow_2" , "HRV_LFpow_1" , "HRV_LFpow_2", "HRV_TP_1", "HRV_TP_2",
+                                  "HRV_RMSSD_1", "HRV_RMSSD_2", "HRV_SDNN_1", "HRV_SDNN_2","HRV_LFHF_1", "HRV_LFHF_2"), ]))
+
+
+
+a <- seq(0.1, 0.9, 0.05)
+set.seed(123987)
+search <- foreach(i = a, .combine = rbind) %dopar% {
+  cv <- cv.glmnet(mdlX, mdlY, family = "binomial", nfold = 10, type.measure = "deviance", parallel  = TRUE, alpha = i)
+  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+}
+cv3 <- search[search$cvm == min(search$cvm), ]
+#md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = .15, alpha = .35)
+md_anx <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+coef(md_anx)
+#class(newY)
+roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+ROC_EN_BECK_Com = roc(as.factor(newY), predict(md_anx, newX, type = "response", direction = ">"))
+as.factor(as.numeric(newY))
+
+ggroc(ROC_EN_BECK_Com, colour = 'steelblue', legacy.axes = TRUE, size = 2) + 
+  theme(text=element_text(size= 16)) +
+  ggtitle(paste0('Elastic net regression with anxiety outcome ',
+                 '(AUC = ', round(ROC_EN_BECK_Com$auc,4),')'))
+```
+
+### OUTPUT
+```{r}
+#13 x 1 sparse Matrix of class "dgCMatrix"
+                  # s0
+# (Intercept) -1.882731
+# HRV_HFpow_1  0.000000
+# HRV_HFpow_2  .       
+# HRV_LFpow_1  .       
+# HRV_LFpow_2  .       
+# HRV_TP_1     .       
+# HRV_TP_2     .       
+# HRV_RMSSD_1  .       
+# HRV_RMSSD_2  .       
+# HRV_SDNN_1   .       
+# HRV_SDNN_2   .       
+# HRV_LFHF_1   .       
+# HRV_LFHF_2   .  
+                   
+# cv3$lambda.1se
+# [1] 0.85
+# > cv3$alpha
+# [1] 0.15                  
+```
+
+
+### Group totals 
+```{r}
+table(df_epds_pred_complete$pp_EPDS)
+
+table(df_beck_pred_complete$pp_BECK)
+
+table(df_epds_pred_complete$EPDS_32_tot)
+```
+
+
+### Overlap between groups
+```{r}
+xtabs(~ppv6_EPDS_10_11R + ppv6_beck_score_R_01, data=BASIC_updated_22nov_na_rm)
+
+xtabs(~ppv6_EPDS_10_11R + v32_EPDS_D_9R, data=df1)
+```
+
+
+### Calcualting percent change for DEP outcome. !! LOOK UP HRV_PerChg.Rmd or HRV_Table2.Rmd for updated analyses!!
+```{r}
+library(dplyr)
+EPDS_HF_PC <- df_epds_pred_complete %>% 
+  select(HRV_HFpow_1, HRV_HFpow_2) %>%
+  mutate(HF_pct_chg = (100 * (HRV_HFpow_2 - (HRV_HFpow_1))/(HRV_HFpow_1)))
+
+
+EPDS_LF_PC <- df_epds_pred_complete %>% 
+  select(HRV_LFpow_1, HRV_LFpow_2) %>%
+  mutate(LF_pct_chg = (100 * (HRV_LFpow_2 - (HRV_LFpow_1))/(HRV_LFpow_1)))
+
+
+EPDS_TP_PC <- df_epds_pred_complete %>% 
+  select(HRV_TP_1, HRV_TP_2) %>%
+  mutate(TP_pct_chg = (100 * (HRV_TP_2 - (HRV_TP_1))/(HRV_TP_1)))
+
+EPDS_LFHF_PC <- df_epds_pred_complete %>% 
+  select(HRV_LFHF_1, HRV_LFHF_2) %>%
+  mutate(LFHF_pct_chg = (100 * (HRV_LFHF_2 - (HRV_LFHF_1))/(HRV_LFHF_1)))
+
+EPDS_RMSSD_PC <- df_epds_pred_complete %>% 
+  select(HRV_RMSSD_1, HRV_RMSSD_2) %>%
+  mutate(RMSSD_pct_chg = (100 * (HRV_RMSSD_2 - (HRV_RMSSD_1))/(HRV_RMSSD_1)))
+
+EPDS_SDNN_PC <- df_epds_pred_complete %>% 
+  select(HRV_SDNN_1, HRV_SDNN_2) %>%
+  mutate(SDNN_pct_chg = (100 * (HRV_SDNN_2 - (HRV_SDNN_1))/(HRV_SDNN_1)))
+
+```
+
+```{r}
+
+t.test(EPDS_HF_PC$HF_pct_chg  ~  df_epds_pred_complete$pp_EPDS)
+
+t.test(EPDS_LF_PC$LF_pct_chg  ~  df_epds_pred_complete$pp_EPDS)
+
+df_epds_pred_complete$pp_EPDS <- as.numeric(df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(EPDS_LFHF_PC$LFHF_pct_chg, df_epds_pred_complete$pp_EPDS)
+
+t.test(EPDS_TP_PC$TP_pct_chg  ~  df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(EPDS_RMSSD_PC$RMSSD_pct_chg, df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(EPDS_SDNN_PC$SDNN_pct_chg, df_epds_pred_complete$pp_EPDS)
+```
+
+### Check histograms
+```{r}
+histogram(EPDS_HF_PC$HF_pct_chg)
+histogram(EPDS_LF_PC$LF_pct_chg)
+histogram(EPDS_LFHF_PC$LFHF_pct_chg)
+histogram(EPDS_TP_PC$TP_pct_chg)
+histogram(EPDS_RMSSD_PC$RMSSD_pct_chg)
+histogram(EPDS_SDNN_PC$SDNN_pct_chg)
+
+
+```
+
+
+
+### Calcualting percent change for ANX outcome
+
+```{r}
+library(dplyr)
+BECK_HF_PC <- df_beck_pred_complete %>% 
+  select(HRV_HFpow_1, HRV_HFpow_2) %>%
+  mutate(HF_pct_chg = (100 * (HRV_HFpow_2 - (HRV_HFpow_1))/(HRV_HFpow_1)))
+
+
+BECK_LF_PC <- df_beck_pred_complete %>% 
+  select(HRV_LFpow_1, HRV_LFpow_2) %>%
+  mutate(LF_pct_chg = (100 * (HRV_LFpow_2 - (HRV_LFpow_1))/(HRV_LFpow_1)))
+
+
+BECK_TP_PC <- df_beck_pred_complete %>% 
+  select(HRV_TP_1, HRV_TP_2) %>%
+  mutate(TP_pct_chg = (100 * (HRV_TP_2 - (HRV_TP_1))/(HRV_TP_1)))
+
+BECK_LFHF_PC <- df_beck_pred_complete %>% 
+  select(HRV_LFHF_1, HRV_LFHF_2) %>%
+  mutate(LFHF_pct_chg = (100 * (HRV_LFHF_2 - (HRV_LFHF_1))/(HRV_LFHF_1)))
+
+BECK_RMSSD_PC <- df_beck_pred_complete %>% 
+  select(HRV_RMSSD_1, HRV_RMSSD_2) %>%
+  mutate(RMSSD_pct_chg = (100 * (HRV_RMSSD_2 - (HRV_RMSSD_1))/(HRV_RMSSD_1)))
+
+BECK_SDNN_PC <- df_beck_pred_complete %>% 
+  select(HRV_SDNN_1, HRV_SDNN_2) %>%
+  mutate(SDNN_pct_chg = (100 * (HRV_SDNN_2 - (HRV_SDNN_1))/(HRV_SDNN_1)))
+
+```
+
+
+
+```{r}
+t.test(BECK_HF_PC$HF_pct_chg  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(BECK_LF_PC$LF_pct_chg  ~    df_beck_pred_complete$pp_BECK)
+
+df_beck_pred_complete$pp_BECK <- as.numeric(df_beck_pred_complete$pp_BECK)
+wilcox.test(BECK_LFHF_PC$LFHF_pct_chg,  df_beck_pred_complete$pp_BECK)
+
+t.test(BECK_TP_PC$TP_pct_chg  ~   df_beck_pred_complete$pp_BECK)
+
+wilcox.test(BECK_RMSSD_PC$RMSSD_pct_chg,  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(BECK_SDNN_PC$SDNN_pct_chg,  df_beck_pred_complete$pp_BECK)
+```
+
+
+
+### Check BECK histogram 
+```{r}
+histogram(df_beck_pred_complete$HRV_HFpow_1)
+histogram(df_beck_pred_complete$HRV_HFpow_2)
+histogram(df_beck_pred_complete$HRV_LFpow_1)
+histogram(df_beck_pred_complete$HRV_LFpow_2)
+histogram(df_beck_pred_complete$HRV_TP_1)
+histogram(df_beck_pred_complete$HRV_TP_2)
+histogram(BECK_HF_PC$HF_pct_chg)
+histogram(BECK_LF_PC$LF_pct_chg)
+histogram(BECK_LFHF_PC$LFHF_pct_chg)
+
+df_beck_pred_complete$pp_BECK <- as.numeric(df_beck_pred_complete$pp_BECK)
+wilcox.test(BECK_LFHF_PC$LFHF_pct_chg,  df_beck_pred_complete$pp_BECK)
+
+histogram(BECK_TP_PC$TP_pct_chg)
+histogram(BECK_RMSSD_PC$RMSSD_pct_chg)
+wilcox.test(BECK_RMSSD_PC$RMSSD_pct_chg,  df_beck_pred_complete$pp_BECK)
+
+histogram(BECK_SDNN_PC$SDNN_pct_chg)
+
+wilcox.test(BECK_SDNN_PC$SDNN_pct_chg,  df_beck_pred_complete$pp_BECK)
+```
+
+

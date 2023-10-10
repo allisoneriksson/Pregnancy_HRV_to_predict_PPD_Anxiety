@@ -1,0 +1,124 @@
+---
+title: "HRV_Table2"
+author: "Allison Eriksson"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    collapsed: false
+    number_sections: true
+    editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+library(haven)
+library(lattice)
+df_epds_pred_complete <- read_sav("df_epds_pred_complete.sav")
+View(df_epds_pred_complete)
+
+df_beck_pred_complete <- read_sav("df_beck_pred_complete.sav")
+View(df_beck_pred_complete)
+```
+
+## DEP Histogram 
+```{r cars}
+histogram(df_epds_pred_complete$HRV_HFpow_1)
+histogram(df_epds_pred_complete$HRV_HFpow_2)
+histogram(df_epds_pred_complete$HRV_LFpow_1)
+histogram(df_epds_pred_complete$HRV_LFpow_2)
+histogram(df_epds_pred_complete$HRV_TP_1)
+histogram(df_epds_pred_complete$HRV_TP_2)
+histogram(df_epds_pred_complete$HRV_LFHF_1)# Skewed
+histogram(df_epds_pred_complete$HRV_LFHF_2)# Skewed
+histogram(df_epds_pred_complete$HRV_RMSSD_1) # Skewed
+histogram(df_epds_pred_complete$HRV_RMSSD_2) # Skewed
+histogram(df_epds_pred_complete$HRV_SDNN_1)
+histogram(df_epds_pred_complete$HRV_SDNN_2)
+```
+
+## HRV/DEP group differences
+
+
+```{r, echo=FALSE}
+t.test(df_epds_pred_complete$HRV_HFpow_1  ~  df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_HFpow_2  ~  df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_LFpow_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_LFpow_2 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_TP_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_TP_2 ~ df_epds_pred_complete$pp_EPDS)
+
+df_epds_pred_complete$pp_EPDS <- as.numeric(df_epds_pred_complete$pp_EPDS)
+wilcox.test(df_epds_pred_complete$HRV_RMSSD_1, df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(df_epds_pred_complete$HRV_LFHF_1, df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(df_epds_pred_complete$HRV_LFHF_2, df_epds_pred_complete$pp_EPDS)
+
+wilcox.test(df_epds_pred_complete$HRV_RMSSD_2, df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_SDNN_1 ~ df_epds_pred_complete$pp_EPDS)
+
+t.test(df_epds_pred_complete$HRV_SDNN_2 ~ df_epds_pred_complete$pp_EPDS)
+
+ 
+```
+
+## ANX histogram
+```{r}
+histogram(df_beck_pred_complete$HRV_HFpow_1)
+histogram(df_beck_pred_complete$HRV_HFpow_2)
+histogram(df_beck_pred_complete$HRV_LFpow_1)
+histogram(df_beck_pred_complete$HRV_LFpow_2)
+histogram(df_beck_pred_complete$HRV_TP_1)
+histogram(df_beck_pred_complete$HRV_TP_2)
+histogram(df_beck_pred_complete$HRV_LFHF_1)# Skewed
+histogram(df_beck_pred_complete$HRV_LFHF_2)# Skewed
+histogram(df_beck_pred_complete$HRV_RMSSD_1) # Skewed
+histogram(df_beck_pred_complete$HRV_RMSSD_2) # Skewed
+histogram(df_beck_pred_complete$HRV_SDNN_1)
+histogram(df_beck_pred_complete$HRV_SDNN_2)
+```
+
+## HRV/ANX group differences
+```{r}
+t.test(df_beck_pred_complete$HRV_HFpow_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_HFpow_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_LFpow_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_LFpow_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_TP_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_TP_2  ~  df_beck_pred_complete$pp_BECK)
+
+df_beck_pred_complete$pp_BECK <- as.numeric(df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_LFHF_1  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_LFHF_2  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_RMSSD_1  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_RMSSD_2  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_SDNN_1  ~  df_beck_pred_complete$pp_BECK)
+
+t.test(df_beck_pred_complete$HRV_SDNN_2  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_SDNN_1  ~  df_beck_pred_complete$pp_BECK)
+
+wilcox.test(df_beck_pred_complete$HRV_SDNN_2  ~  df_beck_pred_complete$pp_BECK)
+```
+
+
+
+
